@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>places — discover through people you trust</title>
+<meta name="description" content="A private social network for discovering restaurants through people you actually trust.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0e0d0c;
+    --cream: #f5f0e8;
+    --terra: #c4603e;
+    --muted: rgba(245,240,232,0.38);
+    --serif: 'Cormorant Garamond', serif;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: var(--sans);
+    font-weight: 300;
+    line-height: 1.6;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  .cursor {
+    position: fixed;
+    width: 8px; height: 8px;
+    background: var(--cream);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s, height 0.2s, background 0.2s;
+    mix-blend-mode: difference;
+  }
+  .cursor.big {
+    width: 40px; height: 40px;
+  }
+
+  /* Nav */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 28px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 100;
+    mix-blend-mode: difference;
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: -0.5px;
+    color: var(--cream);
+    text-decoration: none;
+  }
+
+  .nav-cta {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--cream);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .nav-cta:hover { opacity: 1; }
+
+  /* Hero */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    padding: 120px 40px 80px;
+  }
+
+  /* Scattered photos */
+  .photos {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    height: 420px;
+    margin-bottom: 80px;
+    flex-shrink: 0;
+  }
+
+  .photo {
+    position: absolute;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    transition: transform 0.6s cubic-bezier(0.16,1,0.3,1);
+    will-change: transform;
+  }
+
+  .photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: saturate(0.85);
+  }
+
+  .photo:nth-child(1) { width: 210px; height: 280px; left: 2%;  top: 20px; transform: rotate(-6deg); }
+  .photo:nth-child(2) { width: 180px; height: 240px; left: 18%; top: 60px; transform: rotate(3deg); }
+  .photo:nth-child(3) { width: 230px; height: 300px; left: 35%; top: 0px;  transform: rotate(-2deg); z-index:2; }
+  .photo:nth-child(4) { width: 190px; height: 250px; left: 58%; top: 50px; transform: rotate(5deg); }
+  .photo:nth-child(5) { width: 175px; height: 235px; left: 74%; top: 25px; transform: rotate(-4deg); }
+
+  .photo:hover { transform: rotate(0deg) scale(1.04) !important; z-index: 10; }
+
+  /* Hero text */
+  .hero-text {
+    text-align: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  .hero-eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: up 0.8s 0.2s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+
+  .hero-title {
+    font-family: var(--serif);
+    font-size: clamp(52px, 8vw, 96px);
+    font-weight: 300;
+    line-height: 0.92;
+    letter-spacing: -2px;
+    margin-bottom: 28px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: up 1s 0.35s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+
+  .hero-title em {
+    font-style: italic;
+    color: rgba(245,240,232,0.45);
+  }
+
+  .hero-sub {
+    font-size: 15px;
+    font-weight: 300;
+    color: var(--muted);
+    max-width: 360px;
+    margin: 0 auto 48px;
+    line-height: 1.7;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: up 0.8s 0.5s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+
+  /* Download buttons */
+  .btns {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: up 0.8s 0.65s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    border-radius: 100px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    transition: all 0.25s ease;
+    border: 1px solid rgba(245,240,232,0.2);
+    color: var(--cream);
+    background: rgba(245,240,232,0.06);
+    backdrop-filter: blur(10px);
+  }
+
+  .btn:hover {
+    background: var(--cream);
+    color: var(--ink);
+    border-color: var(--cream);
+    transform: translateY(-2px);
+  }
+
+  .btn svg { flex-shrink: 0; }
+
+  .btn-primary {
+    background: var(--cream);
+    color: var(--ink);
+    border-color: var(--cream);
+  }
+  .btn-primary:hover {
+    background: rgba(245,240,232,0.88);
+    transform: translateY(-2px);
+  }
+
+  /* Divider line */
+  .divider {
+    width: 1px;
+    height: 80px;
+    background: linear-gradient(to bottom, transparent, rgba(245,240,232,0.2), transparent);
+    margin: 0 auto;
+  }
+
+  /* Concept section */
+  .concept {
+    padding: 100px 40px;
+    max-width: 1000px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+
+  .concept-label {
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .concept-title {
+    font-family: var(--serif);
+    font-size: clamp(36px, 4vw, 54px);
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: 24px;
+  }
+
+  .concept-body {
+    font-size: 15px;
+    font-weight: 300;
+    color: rgba(245,240,232,0.55);
+    line-height: 1.8;
+  }
+
+  .concept-visual {
+    position: relative;
+    height: 400px;
+  }
+
+  .concept-card {
+    position: absolute;
+    background: rgba(245,240,232,0.04);
+    border: 1px solid rgba(245,240,232,0.1);
+    border-radius: 16px;
+    padding: 20px;
+    width: 260px;
+  }
+
+  .concept-card:nth-child(1) { top: 0; left: 0; }
+  .concept-card:nth-child(2) { top: 130px; left: 60px; background: rgba(196,96,62,0.08); border-color: rgba(196,96,62,0.25); }
+  .concept-card:nth-child(3) { top: 260px; left: 20px; }
+
+  .card-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .card-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: rgba(245,240,232,0.1);
+    flex-shrink: 0;
+  }
+  .card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .card-name { font-size: 13px; font-weight: 400; }
+  .card-handle { font-size: 11px; color: var(--muted); }
+
+  .card-place {
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 400;
+    margin-bottom: 4px;
+  }
+
+  .card-loc {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  .tag {
+    font-size: 10px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    background: rgba(245,240,232,0.08);
+    color: rgba(245,240,232,0.6);
+    letter-spacing: 0.04em;
+  }
+
+  /* Pillars */
+  .pillars {
+    padding: 80px 40px 120px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .pillars-header {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+
+  .pillars-title {
+    font-family: var(--serif);
+    font-size: clamp(32px, 4vw, 48px);
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: -1px;
+  }
+
+  .pillars-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    border: 1px solid rgba(245,240,232,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .pillar {
+    padding: 40px 32px;
+    border-right: 1px solid rgba(245,240,232,0.08);
+    position: relative;
+  }
+  .pillar:last-child { border-right: none; }
+
+  .pillar-num {
+    font-family: var(--serif);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 24px;
+  }
+
+  .pillar-title {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-weight: 400;
+    margin-bottom: 12px;
+    line-height: 1.15;
+  }
+
+  .pillar-body {
+    font-size: 13px;
+    font-weight: 300;
+    color: rgba(245,240,232,0.45);
+    line-height: 1.7;
+  }
+
+  /* Waitlist */
+  .waitlist {
+    padding: 100px 40px 80px;
+    text-align: center;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .waitlist-title {
+    font-family: var(--serif);
+    font-size: clamp(36px, 5vw, 60px);
+    font-weight: 300;
+    line-height: 1.05;
+    letter-spacing: -1.5px;
+    margin-bottom: 16px;
+  }
+
+  .waitlist-sub {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 40px;
+  }
+
+  .waitlist-form {
+    display: flex;
+    gap: 10px;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .waitlist-input {
+    flex: 1;
+    padding: 14px 18px;
+    background: rgba(245,240,232,0.06);
+    border: 1px solid rgba(245,240,232,0.15);
+    border-radius: 100px;
+    color: var(--cream);
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 300;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .waitlist-input::placeholder { color: rgba(245,240,232,0.3); }
+  .waitlist-input:focus { border-color: rgba(245,240,232,0.4); }
+
+  .waitlist-btn {
+    padding: 14px 24px;
+    background: var(--cream);
+    color: var(--ink);
+    border: none;
+    border-radius: 100px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: none;
+    transition: opacity 0.2s, transform 0.2s;
+    white-space: nowrap;
+  }
+  .waitlist-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+  .waitlist-success {
+    display: none;
+    font-size: 14px;
+    color: rgba(245,240,232,0.55);
+    margin-top: 20px;
+  }
+  .waitlist-success.show { display: block; }
+
+  /* Footer */
+  footer {
+    padding: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid rgba(245,240,232,0.07);
+  }
+
+  .footer-logo {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 400;
+    color: rgba(245,240,232,0.35);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 28px;
+  }
+
+  .footer-link {
+    font-size: 12px;
+    color: rgba(245,240,232,0.25);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    transition: color 0.2s;
+  }
+  .footer-link:hover { color: rgba(245,240,232,0.7); }
+
+  /* Animations */
+  @keyframes up {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Grain overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.028;
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    nav { padding: 20px 24px; }
+
+    .hero { padding: 100px 24px 60px; }
+
+    .photos { height: 280px; margin-bottom: 48px; }
+    .photo:nth-child(1) { width: 140px; height: 185px; }
+    .photo:nth-child(2) { width: 120px; height: 160px; left: 22%; }
+    .photo:nth-child(3) { width: 155px; height: 200px; left: 38%; }
+    .photo:nth-child(4) { width: 128px; height: 168px; left: 60%; }
+    .photo:nth-child(5) { display: none; }
+
+    .concept { grid-template-columns: 1fr; gap: 48px; padding: 60px 24px; }
+    .concept-visual { height: 320px; }
+    .concept-card { width: 220px; }
+
+    .pillars { padding: 60px 24px 80px; }
+    .pillars-grid { grid-template-columns: 1fr; }
+    .pillar { border-right: none; border-bottom: 1px solid rgba(245,240,232,0.08); }
+    .pillar:last-child { border-bottom: none; }
+
+    .waitlist { padding: 60px 24px; }
+    .waitlist-form { flex-direction: column; }
+
+    footer { flex-direction: column; gap: 20px; padding: 28px 24px; }
+    .footer-links { flex-wrap: wrap; justify-content: center; gap: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+
+<!-- Nav -->
+<nav>
+  <a href="/" class="logo">places</a>
+  <a href="#waitlist" class="nav-cta">Get early access →</a>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="photos" id="photos">
+    <div class="photo">
+      <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&fit=crop" alt="">
+    </div>
+    <div class="photo">
+      <img src="https://images.unsplash.com/photo-1551218808-94e220e084d2?w=600&fit=crop" alt="">
+    </div>
+    <div class="photo">
+      <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&fit=crop" alt="">
+    </div>
+    <div class="photo">
+      <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&fit=crop" alt="">
+    </div>
+    <div class="photo">
+      <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&fit=crop" alt="">
+    </div>
+  </div>
+
+  <div class="hero-text">
+    <div class="hero-eyebrow">A new way to discover</div>
+    <h1 class="hero-title">
+      Discover places<br><em>through people</em><br>you trust
+    </h1>
+    <p class="hero-sub">
+      A private social network for food. No fake reviews. No noise. Just recommendations from people whose taste you trust.
+    </p>
+    <div class="btns">
+      <a href="https://apps.apple.com" class="btn btn-primary" target="_blank" rel="noopener" id="ios-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        App Store
+      </a>
+      <a href="https://play.google.com" class="btn" target="_blank" rel="noopener" id="android-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.3.17.64.22.99.15l12.24-7.07-2.52-2.52-10.71 9.44zm-1.47-20.4A1.73 1.73 0 001.5 4.5v15c0 .57.27 1.07.69 1.39l.09.07 8.4-8.4v-.2l-8.47-8.4-.1.1zm18.49 8.74l-2.46-1.42-2.83 2.83 2.84 2.84 2.47-1.43c.71-.41.71-1.07-.02-1.82zM4.17.24L16.4 7.3 13.88 9.8 3.17.37l1 .13-.13-.26z"/></svg>
+        Google Play
+      </a>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- Concept -->
+<section class="concept">
+  <div>
+    <div class="concept-label">The idea</div>
+    <h2 class="concept-title">People you follow.<br>Places you'll love.</h2>
+    <p class="concept-body">
+      Online reviews are broken. Fake ratings, generic opinions, people with completely different tastes than yours.<br><br>
+      Places is built on a different idea: the best recommendation comes from someone you actually know. Follow friends, follow people with your taste. See where they eat.
+    </p>
+  </div>
+  <div class="concept-visual">
+    <div class="concept-card">
+      <div class="card-user">
+        <div class="card-avatar">
+          <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&fit=crop&crop=face" alt="">
+        </div>
+        <div>
+          <div class="card-name">Maria</div>
+          <div class="card-handle">@mariabcn</div>
+        </div>
+      </div>
+      <div class="card-place">Bar Cañete</div>
+      <div class="card-loc">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        El Raval, Barcelona
+      </div>
+      <div class="card-tags">
+        <span class="tag">dinner</span>
+        <span class="tag">fancy</span>
+        <span class="tag">date</span>
+      </div>
+    </div>
+
+    <div class="concept-card">
+      <div class="card-user">
+        <div class="card-avatar">
+          <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&fit=crop&crop=face" alt="">
+        </div>
+        <div>
+          <div class="card-name">Luca</div>
+          <div class="card-handle">@lucacoffee</div>
+        </div>
+      </div>
+      <div class="card-place">Nomad Coffee Lab</div>
+      <div class="card-loc">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Poblenou, Barcelona
+      </div>
+      <div class="card-tags">
+        <span class="tag">coffee</span>
+        <span class="tag">quick</span>
+      </div>
+    </div>
+
+    <div class="concept-card">
+      <div class="card-user">
+        <div class="card-avatar">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&fit=crop&crop=face" alt="">
+        </div>
+        <div>
+          <div class="card-name">Nina</div>
+          <div class="card-handle">@ninaeats</div>
+        </div>
+      </div>
+      <div class="card-place">Federal Café</div>
+      <div class="card-loc">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Sant Antoni, Barcelona
+      </div>
+      <div class="card-tags">
+        <span class="tag">brunch</span>
+        <span class="tag">coffee</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pillars -->
+<section class="pillars">
+  <div class="pillars-header">
+    <div class="concept-label" style="text-align:center;margin-bottom:16px">How it works</div>
+    <h2 class="pillars-title">Simple.<br>Intentional.</h2>
+  </div>
+  <div class="pillars-grid">
+    <div class="pillar">
+      <div class="pillar-num">01</div>
+      <div class="pillar-title">Follow people,<br>not restaurants</div>
+      <p class="pillar-body">Your feed shows places from people you follow. Chronological. No algorithm, no ads, no noise.</p>
+    </div>
+    <div class="pillar">
+      <div class="pillar-num">02</div>
+      <div class="pillar-title">Share in<br>seconds</div>
+      <p class="pillar-body">Photo, place name, a quick take. That's it. No long reviews. If it's worth sharing, it should take less than 20 seconds.</p>
+    </div>
+    <div class="pillar">
+      <div class="pillar-num">03</div>
+      <div class="pillar-title">Save places<br>you want to try</div>
+      <p class="pillar-body">Bookmark any place in one tap. Come back when you're hungry. Your saved places are always there.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Waitlist -->
+<section class="waitlist" id="waitlist">
+  <div class="concept-label">Coming soon</div>
+  <h2 class="waitlist-title">Be the first<br>to know</h2>
+  <p class="waitlist-sub">We're launching in Barcelona first. Leave your email and we'll reach out when it's ready.</p>
+
+  <form class="waitlist-form" id="wl-form">
+    <input type="email" class="waitlist-input" placeholder="your@email.com" required id="wl-email">
+    <button type="submit" class="waitlist-btn">Join waitlist</button>
+  </form>
+  <div class="waitlist-success" id="wl-success">You're on the list. We'll be in touch 🍴</div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-logo">places</div>
+  <div class="footer-links">
+    <a href="mailto:hello@places.app" class="footer-link">Contact</a>
+    <a href="https://instagram.com" class="footer-link">Instagram</a>
+    <a href="/privacy" class="footer-link">Privacy</a>
+    <a href="/terms" class="footer-link">Terms</a>
+  </div>
+</footer>
+
+<script>
+  // Custom cursor
+  const cursor = document.getElementById('cursor');
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top = e.clientY + 'px';
+  });
+  document.querySelectorAll('a, button, .photo').forEach(el => {
+    el.addEventListener('mouseenter', () => cursor.classList.add('big'));
+    el.addEventListener('mouseleave', () => cursor.classList.remove('big'));
+  });
+
+  // Parallax on photos
+  const photos = document.querySelectorAll('.photo');
+  const baseRotations = [-6, 3, -2, 5, -4];
+  document.addEventListener('mousemove', e => {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const dx = (e.clientX - cx) / cx;
+    const dy = (e.clientY - cy) / cy;
+    photos.forEach((p, i) => {
+      const depth = (i % 3 + 1) * 0.4;
+      const tx = dx * depth * 12;
+      const ty = dy * depth * 8;
+      const r = baseRotations[i] + dx * depth * 2;
+      p.style.transform = `translateX(${tx}px) translateY(${ty}px) rotate(${r}deg)`;
+    });
+  });
+
+  // Stagger photo entrance
+  photos.forEach((p, i) => {
+    p.style.opacity = '0';
+    p.style.transform += ' translateY(30px)';
+    setTimeout(() => {
+      p.style.transition = 'opacity 0.9s ease, transform 0.9s cubic-bezier(0.16,1,0.3,1)';
+      p.style.opacity = '1';
+    }, 100 + i * 80);
+  });
+
+  // Waitlist form
+  // NOTE: Replace this fetch URL with your actual Supabase URL or API endpoint
+  document.getElementById('wl-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = document.getElementById('wl-email').value;
+    const btn = e.target.querySelector('button');
+    btn.textContent = '...';
+    btn.disabled = true;
+
+    try {
+      // Replace with your Supabase URL + anon key, or any other endpoint
+      // Example with Supabase:
+      // const res = await fetch('https://YOUR_PROJECT.supabase.co/rest/v1/waitlist', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'apikey': 'YOUR_ANON_KEY',
+      //     'Authorization': 'Bearer YOUR_ANON_KEY'
+      //   },
+      //   body: JSON.stringify({ email })
+      // });
+      
+      // For now, simulate success
+      await new Promise(r => setTimeout(r, 800));
+      
+      document.getElementById('wl-form').style.display = 'none';
+      document.getElementById('wl-success').classList.add('show');
+    } catch(err) {
+      btn.textContent = 'Join waitlist';
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
