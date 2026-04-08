@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Yumlist Negocios</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230e0d0c' rx='8'/><circle cx='11' cy='16' r='8' fill='%23C4622D'/><circle cx='19' cy='16' r='8' fill='%23F5F0E8' fill-opacity='0.15'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="business.css">
+<style>
+  .admin-layout { max-width: 820px; }
+  .doc-link { font-size: 12px; color: rgba(245,240,232,.5); text-decoration: none; transition: color .2s; }
+  .doc-link:hover { color: var(--cream); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+
+<div class="app-layout">
+  <div id="sidebar-mount"></div>
+  <main class="main-content">
+    <div class="admin-layout">
+      <div class="page-header">
+        <div class="page-label">Administración</div>
+        <h1 class="page-title">Verificaciones pendientes</h1>
+      </div>
+      <div id="content"><div class="loading">Cargando solicitudes…</div></div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="business-auth.js"></script>
+<script>
+async function init() {
+  const session = await requireAdmin();
+  if (!session) return;
+
+  // Build minimal sidebar for admin
+  document.getElementById('sidebar-mount').innerHTML = buildSidebar(
+    { nombre: 'Admin', status: 'verified', plan: 'premium' },
+    '/business/admin'
+  );
+
+  await loadPending();
+  initCursor();
+}
+
+async function loadPending() {
+  const content = document.getElementById('content');
+
+  // Fetch pending docs joined with business accounts
+  const { data: docs, error } = await sb
+    .from('business_verification_docs')
+    .select('*, business_accounts(id, nombre, cif, titular, ciudad, user_id, status)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    content.innerHTML = `<div class="alert alert-error">Error al cargar: ${error.message}</div>`;
+    return;
+  }
+
+  if (!docs || docs.length === 0) {
+    content.innerHTML = '<div class="empty">No hay solicitudes pendientes. ✓</div>';
+    return;
+  }
+
+  // Fetch emails from auth — we do this per account via the user_id
+  content.innerHTML = docs.map(doc => {
+    const acc = doc.business_accounts ?? {};
+    return `
+      <div class="verification-card" id="doc-${doc.id}">
+        <div class="verification-name">${acc.nombre ?? '—'}</div>
+        <div class="verification-meta">
+          <span>CIF: ${acc.cif ?? '—'}</span>
+          <span>Titular: ${acc.titular ?? '—'}</span>
+          <span>Ciudad: ${acc.ciudad ?? '—'}</span>
+          <span>Recibido: ${formatDate(doc.created_at)}</span>
+        </div>
+        <div style="margin-bottom:12px">
+          <a href="#" class="doc-link" id="doc-link-${doc.id}" onclick="getDocUrl('${doc.document_url}', '${doc.id}'); return false;">
+            Ver documento →
+          </a>
+          <span id="doc-url-${doc.id}" style="font-size:12px;color:rgba(245,240,232,.35);margin-left:8px"></span>
+        </div>
+        <div class="verification-actions">
+          <button class="btn-approve" onclick="approveDoc('${doc.id}', '${acc.id}', '${acc.user_id}')">Aprobar</button>
+          <button class="btn-reject"  onclick="toggleReject('${doc.id}')">Rechazar</button>
+        </div>
+        <div class="reject-form" id="rf-${doc.id}">
+          <textarea class="form-input" id="rt-${doc.id}" placeholder="Motivo del rechazo (se enviará por email)..." style="margin-top:8px;margin-bottom:8px"></textarea>
+          <button class="btn-sm" onclick="rejectDoc('${doc.id}', '${acc.id}', '${acc.user_id}')">Confirmar rechazo</button>
+          <div id="rm-${doc.id}" style="margin-top:6px;font-size:12px;color:var(--muted)"></div>
+        </div>
+        <div id="action-msg-${doc.id}" style="margin-top:10px;font-size:13px"></div>
+      </div>`;
+  }).join('');
+}
+
+async function getDocUrl(path, docId) {
+  const { data, error } = await sb.storage.from('business-docs').createSignedUrl(path, 3600);
+  const el = document.getElementById(`doc-url-${docId}`);
+  if (error || !data?.signedUrl) {
+    el.textContent = 'Error al generar enlace';
+    return;
+  }
+  window.open(data.signedUrl, '_blank');
+  el.textContent = '(enlace válido 1h)';
+}
+
+async function approveDoc(docId, accountId, userId) {
+  const msg = document.getElementById(`action-msg-${docId}`);
+  msg.textContent = 'Aprobando...';
+  msg.style.color = 'var(--muted)';
+
+  // 1. Update business_account status
+  const { error: e1 } = await sb
+    .from('business_accounts')
+    .update({ status: 'verified' })
+    .eq('id', accountId);
+
+  // 2. Update verification doc status
+  const { error: e2 } = await sb
+    .from('business_verification_docs')
+    .update({ status: 'verified' })
+    .eq('id', docId);
+
+  if (e1 || e2) {
+    msg.textContent = 'Error al aprobar. Revisa la consola.';
+    msg.style.color = 'var(--clay)';
+    console.error(e1, e2);
+    return;
+  }
+
+  // 3. Get user email for notification
+  const { data: userData } = await sb.auth.admin?.getUserById?.(userId) ?? { data: null };
+  const email = userData?.user?.email ?? null;
+
+  if (email) {
+    await sendEmailNotification(
+      email,
+      '✓ Tu cuenta en Yumlist Negocios ha sido verificada',
+      `¡Hola! Tu perfil en Yumlist Negocios ha sido verificado. Ya puedes acceder a todas las funciones de tu plan. Entra en https://yumlist.app/business/dashboard`
+    );
+  }
+
+  msg.textContent = '✓ Aprobado correctamente';
+  msg.style.color = 'rgb(100,210,140)';
+
+  // Fade out card after 1.5s
+  setTimeout(() => {
+    const card = document.getElementById(`doc-${docId}`);
+    if (card) { card.style.opacity = '0'; card.style.transition = 'opacity .4s'; setTimeout(() => card.remove(), 400); }
+  }, 1500);
+}
+
+function toggleReject(docId) {
+  document.getElementById(`rf-${docId}`).classList.toggle('open');
+}
+
+async function rejectDoc(docId, accountId, userId) {
+  const motivo = document.getElementById(`rt-${docId}`).value.trim();
+  const msg    = document.getElementById(`rm-${docId}`);
+
+  if (!motivo) { msg.textContent = 'Escribe el motivo antes de confirmar.'; return; }
+
+  msg.textContent = 'Rechazando...';
+
+  const { error: e1 } = await sb.from('business_accounts').update({ status: 'rejected' }).eq('id', accountId);
+  const { error: e2 } = await sb.from('business_verification_docs').update({ status: 'rejected' }).eq('id', docId);
+
+  if (e1 || e2) { msg.textContent = 'Error. Revisa la consola.'; console.error(e1, e2); return; }
+
+  const { data: userData } = await sb.auth.admin?.getUserById?.(userId) ?? { data: null };
+  const email = userData?.user?.email ?? null;
+
+  if (email) {
+    await sendEmailNotification(
+      email,
+      'Tu solicitud de verificación en Yumlist Negocios',
+      `Hemos revisado tu solicitud y no ha podido ser aprobada por el siguiente motivo:\n\n${motivo}\n\nSi tienes dudas o quieres enviar documentación adicional, responde a este email.`
+    );
+  }
+
+  const actionMsg = document.getElementById(`action-msg-${docId}`);
+  actionMsg.textContent = '✗ Rechazado. Email enviado.';
+  actionMsg.style.color = 'var(--clay)';
+  document.getElementById(`rf-${docId}`).classList.remove('open');
+
+  setTimeout(() => {
+    const card = document.getElementById(`doc-${docId}`);
+    if (card) { card.style.opacity = '0'; card.style.transition = 'opacity .4s'; setTimeout(() => card.remove(), 400); }
+  }, 1500);
+}
+
+init();
+</script>
+</body>
+</html>

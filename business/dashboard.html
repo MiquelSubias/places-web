@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Yumlist Negocios</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230e0d0c' rx='8'/><circle cx='11' cy='16' r='8' fill='%23C4622D'/><circle cx='19' cy='16' r='8' fill='%23F5F0E8' fill-opacity='0.15'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="business.css">
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+
+<div class="app-layout">
+  <div id="sidebar-mount"></div>
+  <main class="main-content" id="content">
+    <div class="loading">Cargando dashboard…</div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="business-auth.js"></script>
+<script>
+async function init() {
+  const session = await requireAuth();
+  if (!session) return;
+
+  const account = await getBusinessAccount(session.user.id);
+  document.getElementById('sidebar-mount').innerHTML = buildSidebar(account, '/business/dashboard');
+
+  const content = document.getElementById('content');
+
+  // Pending banner
+  const pendingBanner = account?.status !== 'verified'
+    ? `<div class="alert alert-warning" style="margin-bottom:32px">
+        <strong>Tu cuenta está pendiente de verificación.</strong> Puedes explorar el panel, pero algunas funciones estarán disponibles cuando te verifiquemos. Normalmente tardamos 24–48h.
+        <a href="/business/verificacion" class="auth-link" style="margin-left:8px">Subir documento →</a>
+       </div>`
+    : '';
+
+  // Fetch posts
+  const posts   = await fetchRestaurantPosts(account);
+  const now     = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const postsThisMonth = posts.filter(p => new Date(p.created_at) >= monthStart);
+
+  // Ratings — adjust column names if yours differ (nota_comida, nota_servicio, nota_precio)
+  const foodRatings    = posts.map(p => p.rating_food    ?? p.nota_comida    ?? p.nota).filter(Boolean);
+  const serviceRatings = posts.map(p => p.rating_service ?? p.nota_servicio).filter(Boolean);
+  const priceRatings   = posts.map(p => p.rating_price   ?? p.nota_precio).filter(Boolean);
+
+  const avgFood    = avg(foodRatings);
+  const avgService = avg(serviceRatings);
+  const avgPrice   = avg(priceRatings);
+
+  const overallAvg = (() => {
+    const all = [...foodRatings, ...serviceRatings, ...priceRatings];
+    return avg(all);
+  })();
+
+  // Saved ("Quiero ir") — count unique users who saved any of these posts
+  let quieroIr = '—';
+  if (posts.length > 0) {
+    const postIds = posts.map(p => p.id);
+    const { data: saves } = await sb.from('saved_posts').select('user_id').in('post_id', postIds);
+    if (saves) quieroIr = new Set(saves.map(s => s.user_id)).size;
+  }
+
+  // Recent 3 posts
+  const recentPosts = posts.slice(0, 3);
+
+  const recentHtml = recentPosts.length === 0
+    ? `<div class="empty">Aún no hay posts sobre tu restaurante en Yumlist.</div>`
+    : recentPosts.map(p => {
+        const user    = p.profiles ?? {};
+        const photos  = Array.isArray(p.photos) ? p.photos : (p.photo_url ? [p.photo_url] : []);
+        const photoHtml = photos[0]
+          ? `<img src="${photos[0]}" class="review-photo" alt="" loading="lazy">`
+          : '';
+        const tags = (p.dish_tags ?? p.tags ?? []).slice(0, 4)
+          .map(t => `<span class="tag">${t}</span>`).join('');
+        const food    = p.rating_food    ?? p.nota_comida    ?? p.nota ?? '—';
+        const service = p.rating_service ?? p.nota_servicio ?? '—';
+        const price   = p.rating_price   ?? p.nota_precio   ?? '—';
+
+        return `<div class="review-card">
+          <div class="review-header">
+            <div class="review-user">
+              <div class="review-avatar">
+                ${user.avatar_url ? `<img src="${user.avatar_url}" alt="">` : ''}
+              </div>
+              <div>
+                <div class="review-username">${user.username ?? user.display_name ?? 'Usuario'}</div>
+                <div class="review-date">${formatDate(p.created_at)}</div>
+              </div>
+            </div>
+          </div>
+          ${photoHtml}
+          <div class="review-ratings">
+            <div class="rating-item"><div class="rating-dot"></div>Comida: ${food}</div>
+            ${service !== '—' ? `<div class="rating-item"><div class="rating-dot"></div>Servicio: ${service}</div>` : ''}
+            ${price !== '—'   ? `<div class="rating-item"><div class="rating-dot"></div>Precio: ${price}</div>` : ''}
+          </div>
+          ${p.description ? `<div class="review-description">${p.description}</div>` : ''}
+          ${tags ? `<div class="review-tags">${tags}</div>` : ''}
+        </div>`;
+      }).join('');
+
+  content.innerHTML = `
+    ${pendingBanner}
+    <div class="page-header">
+      <div class="page-label">Panel principal</div>
+      <h1 class="page-title">${account?.nombre ?? 'Tu restaurante'}</h1>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Menciones este mes</div>
+        <div class="stat-value">${postsThisMonth.length}</div>
+        <div class="stat-sub">${posts.length} en total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Nota media</div>
+        <div class="stat-value">${overallAvg}</div>
+        <div class="stat-sub">
+          ${avgFood    !== '—' ? `Comida ${avgFood}` : ''}
+          ${avgService !== '—' ? ` · Servicio ${avgService}` : ''}
+          ${avgPrice   !== '—' ? ` · Precio ${avgPrice}` : ''}
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Quiero ir</div>
+        <div class="stat-value">${quieroIr}</div>
+        <div class="stat-sub">usuarios que te tienen guardado</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Posts este mes</div>
+        <div class="stat-value">${postsThisMonth.length}</div>
+        <div class="stat-sub">de ${posts.length} menciones totales</div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="section-title">Últimas menciones</div>
+    <div class="reviews-list">${recentHtml}</div>
+
+    ${posts.length > 3 ? `<div style="margin-top:20px;text-align:center">
+      <a href="/business/reviews" class="btn-ghost">Ver todas las reviews →</a>
+    </div>` : ''}
+  `;
+
+  initCursor();
+}
+
+init();
+</script>
+</body>
+</html>

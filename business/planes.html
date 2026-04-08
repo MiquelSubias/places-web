@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planes — Yumlist Negocios</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230e0d0c' rx='8'/><circle cx='11' cy='16' r='8' fill='%23C4622D'/><circle cx='19' cy='16' r='8' fill='%23F5F0E8' fill-opacity='0.15'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="business.css">
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+
+<div class="app-layout">
+  <div id="sidebar-mount"></div>
+  <main class="main-content" id="content">
+    <div class="loading">Cargando planes…</div>
+  </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop hidden" id="modal-backdrop" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-title">Próximamente</div>
+    <div class="modal-body">Los pagos estarán disponibles en breve. Te avisaremos por email cuando lancemos los planes de pago.</div>
+    <button class="btn-ghost" onclick="closeModal()" style="width:100%;justify-content:center">Entendido</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="business-auth.js"></script>
+<script>
+async function init() {
+  const session = await requireAuth();
+  if (!session) return;
+
+  const account = await getBusinessAccount(session.user.id);
+  document.getElementById('sidebar-mount').innerHTML = buildSidebar(account, '/business/planes');
+
+  const plan = account?.plan ?? 'free';
+
+  const plans = [
+    {
+      id: 'free',
+      name: 'Gratis',
+      price: '0€',
+      priceNote: 'para siempre',
+      features: [
+        { text: 'Perfil básico del restaurante' },
+        { text: 'Aparecer en el mapa de Yumlist' },
+        { text: 'Nota media agregada' },
+        { text: 'Email mensual resumen' },
+      ],
+      cta: null,
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: '9,99€',
+      priceNote: '+ IVA / mes',
+      badge: 'Más popular',
+      features: [
+        { text: 'Todo lo del plan Gratis, más:', highlight: true },
+        { text: 'Insignia de perfil verificado' },
+        { text: 'Ver todos los posts sobre ti' },
+        { text: 'Responder a reviews públicamente' },
+        { text: 'Dashboard de analytics' },
+        { text: 'Alertas en tiempo real' },
+      ],
+      cta: 'Actualizar a Pro',
+    },
+    {
+      id: 'premium',
+      name: 'Premium',
+      price: '24,99€',
+      priceNote: '+ IVA / mes',
+      features: [
+        { text: 'Todo lo del plan Pro, más:', highlight: true },
+        { text: 'Analytics avanzados y tendencias' },
+        { text: 'Identificación de embajadores' },
+        { text: 'Ofertas exclusivas para usuarios Yumlist' },
+        { text: 'Destacado en Discover' },
+        { text: 'Publicar eventos en tu perfil' },
+      ],
+      cta: 'Actualizar a Premium',
+    },
+  ];
+
+  const plansHtml = plans.map(p => {
+    const isCurrent = p.id === plan;
+    return `<div class="plan-card${isCurrent ? ' current' : ''}">
+      ${isCurrent ? `<div class="plan-badge">Tu plan actual</div>` : (p.badge ? `<div class="plan-badge" style="background:rgba(245,240,232,.12);color:var(--cream)">${p.badge}</div>` : '')}
+      <div class="plan-name">${p.name}</div>
+      <div class="plan-price">${p.price}</div>
+      <div class="plan-price-note">${p.priceNote}</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        ${p.features.map(f => `<li class="plan-feature${f.highlight ? ' highlight' : ''}">${f.text}</li>`).join('')}
+      </ul>
+      ${p.cta && !isCurrent
+        ? `<button class="btn-ghost" style="width:100%;justify-content:center;margin-top:4px" onclick="showModal()">${p.cta} →</button>`
+        : (isCurrent ? `<div style="font-size:12px;color:rgba(245,240,232,.3);text-align:center;padding-top:4px">Plan activo</div>` : '')
+      }
+    </div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div class="page-header">
+      <div class="page-label">Planes</div>
+      <h1 class="page-title">Elige tu plan</h1>
+    </div>
+    <p style="font-size:14px;color:var(--muted);margin-bottom:40px;max-width:500px;line-height:1.7">
+      Empieza gratis y actualiza cuando quieras. Los pagos se activarán próximamente — te avisaremos cuando estén listos.
+    </p>
+    <div class="plans-grid">${plansHtml}</div>
+  `;
+
+  initCursor();
+}
+
+function showModal()  { document.getElementById('modal-backdrop').classList.remove('hidden'); }
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-backdrop') || e.currentTarget === document.querySelector('.btn-ghost')) {
+    document.getElementById('modal-backdrop').classList.add('hidden');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

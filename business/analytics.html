@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analytics — Yumlist Negocios</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230e0d0c' rx='8'/><circle cx='11' cy='16' r='8' fill='%23C4622D'/><circle cx='19' cy='16' r='8' fill='%23F5F0E8' fill-opacity='0.15'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="business.css">
+<style>
+  canvas { max-width: 100%; }
+  .metric-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .metric-pill {
+    padding: 6px 14px;
+    border-radius: 100px;
+    background: rgba(245,240,232,.05);
+    border: 1px solid rgba(245,240,232,.1);
+    font-size: 13px;
+    color: rgba(245,240,232,.7);
+  }
+  .chart-wrap { position: relative; height: 200px; }
+  .toggle-btn {
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    background: none; border: none; color: rgba(245,240,232,.3); cursor: none;
+    font-family: var(--sans); transition: color .2s; padding: 2px 0;
+  }
+  .toggle-btn:hover { color: rgba(245,240,232,.6); }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+
+<div class="app-layout">
+  <div id="sidebar-mount"></div>
+  <main class="main-content" id="content">
+    <div class="loading">Cargando analytics…</div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="business-auth.js"></script>
+<script>
+async function init() {
+  const session = await requireAuth();
+  if (!session) return;
+
+  const account = await getBusinessAccount(session.user.id);
+  document.getElementById('sidebar-mount').innerHTML = buildSidebar(account, '/business/analytics');
+
+  const plan   = account?.plan ?? 'free';
+  const isPro  = plan === 'pro' || plan === 'premium';
+  const isPrem = plan === 'premium';
+
+  const posts = await fetchRestaurantPosts(account);
+
+  // ── Free metrics ──────────────────────────────────────────────────────────
+
+  const totalMentions = posts.length;
+
+  // Overall avg across all rating types
+  const allRatings = posts.flatMap(p => {
+    const vals = [];
+    const food    = p.rating_food    ?? p.nota_comida    ?? p.nota;
+    const service = p.rating_service ?? p.nota_servicio;
+    const price   = p.rating_price   ?? p.nota_precio;
+    if (food    != null) vals.push(Number(food));
+    if (service != null) vals.push(Number(service));
+    if (price   != null) vals.push(Number(price));
+    return vals;
+  }).filter(v => !isNaN(v));
+
+  const overallAvg = avg(allRatings);
+
+  // Last 6 months data for line chart
+  const now = new Date();
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return { label: d.toLocaleDateString('es-ES', { month: 'short' }), start: d, end: new Date(d.getFullYear(), d.getMonth() + 1, 0) };
+  });
+
+  const monthlyCounts = months.map(m =>
+    posts.filter(p => {
+      const d = new Date(p.created_at);
+      return d >= m.start && d <= m.end;
+    }).length
+  );
+
+  // ── Pro metrics ───────────────────────────────────────────────────────────
+
+  const foodRatings    = posts.map(p => p.rating_food    ?? p.nota_comida    ?? p.nota).filter(v => v != null).map(Number);
+  const serviceRatings = posts.map(p => p.rating_service ?? p.nota_servicio).filter(v => v != null).map(Number);
+  const priceRatings   = posts.map(p => p.rating_price   ?? p.nota_precio).filter(v => v != null).map(Number);
+
+  // Dish tags
+  const tagCount = {};
+  posts.forEach(p => {
+    (p.dish_tags ?? p.tags ?? []).forEach(t => { tagCount[t] = (tagCount[t] ?? 0) + 1; });
+  });
+  const topDishes = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  // Saved posts (Quiero ir)
+  let quieroIr = 0;
+  if (posts.length > 0) {
+    const { data: saves } = await sb.from('saved_posts').select('user_id').in('post_id', posts.map(p => p.id));
+    quieroIr = saves ? new Set(saves.map(s => s.user_id)).size : 0;
+  }
+
+  // ── Premium metrics ───────────────────────────────────────────────────────
+
+  // Ambassadors: users who posted more than once
+  const userPostCount = {};
+  posts.forEach(p => { userPostCount[p.user_id] = (userPostCount[p.user_id] ?? 0) + 1; });
+  const ambassadors = Object.entries(userPostCount).filter(([, c]) => c > 1).length;
+
+  // Nearby restaurants (500m) — fetch posts in wider bounding box
+  let nearbyAvg = '—';
+  if (account?.lat && account?.lng) {
+    const delta = 0.0045; // ~500m
+    const { data: nearbyPosts } = await sb.from('posts')
+      .select('lat,lng,rating_food,nota_comida,nota,rating_service,nota_servicio,rating_price,nota_precio')
+      .gte('lat', account.lat - delta).lte('lat', account.lat + delta)
+      .gte('lng', account.lng - delta).lte('lng', account.lng + delta)
+      .limit(200);
+
+    if (nearbyPosts) {
+      // Exclude own restaurant (50m)
+      const others = nearbyPosts.filter(p => p.lat && p.lng && haversine(account.lat, account.lng, p.lat, p.lng) > 50);
+      const nearbyRatings = others.flatMap(p => {
+        const f = p.rating_food ?? p.nota_comida ?? p.nota;
+        return f != null ? [Number(f)] : [];
+      });
+      nearbyAvg = avg(nearbyRatings);
+    }
+  }
+
+  // ── Build HTML ────────────────────────────────────────────────────────────
+
+  const lockedSection = (title, plan, contentHtml) => {
+    const isLocked = (plan === 'pro' && !isPro) || (plan === 'premium' && !isPrem);
+    const upgradeLabel = plan === 'pro' ? 'Desbloquear con Pro' : 'Desbloquear con Premium';
+    return `
+      <div class="analytics-section" id="sec-${plan}-${title.replace(/\s/g,'')}">
+        <div class="analytics-section-header">
+          <div class="analytics-section-title">${title}</div>
+          ${isLocked ? `<button class="toggle-btn" onclick="toggleSection(this)">Ocultar</button>` : ''}
+        </div>
+        <div class="analytics-body">
+          ${isLocked ? `
+            <div class="locked-section">
+              <div class="locked-content">${contentHtml}</div>
+              <div class="locked-overlay">
+                <div class="locked-label">${plan === 'pro' ? 'Plan Pro o superior' : 'Plan Premium'}</div>
+                <a href="/business/planes" class="btn-ghost">${upgradeLabel} →</a>
+              </div>
+            </div>` : contentHtml}
+        </div>
+      </div>`;
+  };
+
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="page-header">
+      <div class="page-label">Analytics</div>
+      <h1 class="page-title">Métricas de tu restaurante</h1>
+    </div>
+
+    <!-- FREE: Summary -->
+    <div class="analytics-section">
+      <div class="analytics-section-header">
+        <div class="analytics-section-title">Resumen general</div>
+      </div>
+      <div class="analytics-body">
+        <div class="stats-grid" style="margin-bottom:0">
+          <div class="stat-card">
+            <div class="stat-label">Menciones totales</div>
+            <div class="stat-value">${totalMentions}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Nota media global</div>
+            <div class="stat-value">${overallAvg}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FREE: Evolución mensual -->
+    <div class="analytics-section">
+      <div class="analytics-section-header">
+        <div class="analytics-section-title">Evolución mensual</div>
+      </div>
+      <div class="analytics-body">
+        <div class="chart-wrap"><canvas id="monthly-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- PRO: Nota desglosada -->
+    ${lockedSection('Nota desglosada', 'pro', `
+      <div class="metric-row">
+        <div class="metric-pill">🍽 Comida: ${avg(foodRatings)}</div>
+        <div class="metric-pill">💬 Servicio: ${avg(serviceRatings)}</div>
+        <div class="metric-pill">💰 Precio: ${avg(priceRatings)}</div>
+      </div>
+    `)}
+
+    <!-- PRO: Platos más mencionados -->
+    ${lockedSection('Platos más mencionados', 'pro', `
+      <div class="review-tags">
+        ${topDishes.length > 0
+          ? topDishes.map(([t, c]) => `<span class="tag">${t} <span style="opacity:.5">${c}</span></span>`).join('')
+          : '<span style="font-size:13px;color:var(--muted)">Sin datos de platos todavía.</span>'}
+      </div>
+    `)}
+
+    <!-- PRO: Quiero ir + alertas -->
+    ${lockedSection('Quiero ir y alertas', 'pro', `
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-label">Personas que te quieren visitar</div>
+          <div class="stat-value">${quieroIr}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;color:rgba(245,240,232,.5)">
+        <label style="display:flex;align-items:center;gap:8px;cursor:none">
+          <input type="checkbox" id="notif-toggle" style="cursor:none"> Activar alertas en tiempo real (notificaciones del navegador)
+        </label>
+      </div>
+    `)}
+
+    <!-- PREMIUM: Embajadores -->
+    ${lockedSection('Embajadores', 'premium', `
+      <div class="stats-grid" style="margin-bottom:0">
+        <div class="stat-card">
+          <div class="stat-label">Usuarios que han publicado más de una vez</div>
+          <div class="stat-value">${ambassadors}</div>
+          <div class="stat-sub">embajadores de tu restaurante</div>
+        </div>
+      </div>
+    `)}
+
+    <!-- PREMIUM: Comparativa con la zona -->
+    ${lockedSection('Comparativa con la zona', 'premium', `
+      <div class="stats-grid" style="margin-bottom:0">
+        <div class="stat-card">
+          <div class="stat-label">Nota media tu restaurante</div>
+          <div class="stat-value">${overallAvg}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Nota media zona (500m, anónimo)</div>
+          <div class="stat-value">${nearbyAvg}</div>
+        </div>
+      </div>
+    `)}
+  `;
+
+  // Chart.js line chart
+  const ctx = document.getElementById('monthly-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: months.map(m => m.label),
+      datasets: [{
+        data: monthlyCounts,
+        borderColor: 'rgba(245,240,232,0.6)',
+        backgroundColor: 'rgba(245,240,232,0.04)',
+        borderWidth: 1.5,
+        pointBackgroundColor: 'rgba(245,240,232,0.8)',
+        pointRadius: 3,
+        fill: true,
+        tension: 0.35,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(245,240,232,0.05)' }, ticks: { color: 'rgba(245,240,232,0.4)', font: { family: 'DM Sans', size: 11 } } },
+        y: { grid: { color: 'rgba(245,240,232,0.05)' }, ticks: { color: 'rgba(245,240,232,0.4)', font: { family: 'DM Sans', size: 11 }, stepSize: 1 }, min: 0 }
+      }
+    }
+  });
+
+  // Notification toggle (Pro only, if unlocked)
+  const notifToggle = document.getElementById('notif-toggle');
+  if (notifToggle) {
+    notifToggle.addEventListener('change', async () => {
+      if (notifToggle.checked) {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') { notifToggle.checked = false; }
+      }
+    });
+  }
+
+  initCursor();
+}
+
+function toggleSection(btn) {
+  const section = btn.closest('.analytics-section');
+  section.classList.toggle('collapsed');
+  btn.textContent = section.classList.contains('collapsed') ? 'Mostrar' : 'Ocultar';
+}
+
+init();
+</script>
+</body>
+</html>

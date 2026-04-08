@@ -1,5 +1,14 @@
 {
   "rewrites": [
-    { "source": "/negocios", "destination": "/negocios.html" }
+    { "source": "/negocios",              "destination": "/negocios.html" },
+    { "source": "/business",              "destination": "/business/index.html" },
+    { "source": "/business/registro",     "destination": "/business/registro.html" },
+    { "source": "/business/login",        "destination": "/business/login.html" },
+    { "source": "/business/verificacion", "destination": "/business/verificacion.html" },
+    { "source": "/business/dashboard",    "destination": "/business/dashboard.html" },
+    { "source": "/business/reviews",      "destination": "/business/reviews.html" },
+    { "source": "/business/analytics",    "destination": "/business/analytics.html" },
+    { "source": "/business/planes",       "destination": "/business/planes.html" },
+    { "source": "/business/admin",        "destination": "/business/admin.html" }
   ]
 }

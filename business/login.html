@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar — Yumlist Negocios</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230e0d0c' rx='8'/><circle cx='11' cy='16' r='8' fill='%23C4622D'/><circle cx='19' cy='16' r='8' fill='%23F5F0E8' fill-opacity='0.15'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="business.css">
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="auth-logo">
+      <a href="/" style="text-decoration:none">
+        <svg width="120" viewBox="0 0 120 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="11" cy="18" r="10" fill="#C4622D"/>
+          <circle cx="19" cy="18" r="10" fill="#F5F0E8" fill-opacity="0.1" stroke="#F5F0E8" stroke-width="0.8"/>
+          <text x="34" y="24" font-family="'Cormorant Garamond',Georgia,serif" font-size="22" font-weight="300" letter-spacing="-1" fill="#F5F0E8">yumlist</text>
+        </svg>
+      </a>
+    </div>
+
+    <div class="page-label">Panel de negocios</div>
+    <h1 class="auth-title">Bienvenido de vuelta.</h1>
+    <p class="auth-sub">Accede a tu panel para ver tus reviews y métricas.</p>
+
+    <div id="alert-container"></div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-input" type="email" id="email" placeholder="restaurante@email.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Contraseña</label>
+        <input class="form-input" type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-primary" id="submit-btn">Entrar</button>
+    </form>
+
+    <div class="auth-footer">
+      ¿No tienes cuenta? <a href="/business/registro" class="auth-link">Regístrate</a>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="business-auth.js"></script>
+<script>
+  // Redirect if already logged in
+  sb.auth.getSession().then(({ data: { session } }) => {
+    if (session) window.location.replace('/business/dashboard');
+  });
+
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn      = document.getElementById('submit-btn');
+    const alerts   = document.getElementById('alert-container');
+
+    alerts.innerHTML = '';
+    btn.textContent = '...';
+    btn.disabled    = true;
+
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      alerts.innerHTML = `<div class="alert alert-error">${error.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos.' : error.message}</div>`;
+      btn.textContent = 'Entrar';
+      btn.disabled    = false;
+      return;
+    }
+
+    window.location.replace('/business/dashboard');
+  });
+
+  initCursor();
+</script>
+</body>
+</html>

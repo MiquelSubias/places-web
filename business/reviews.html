@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reviews — Yumlist Negocios</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230e0d0c' rx='8'/><circle cx='11' cy='16' r='8' fill='%23C4622D'/><circle cx='19' cy='16' r='8' fill='%23F5F0E8' fill-opacity='0.15'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="business.css">
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+
+<div class="app-layout">
+  <div id="sidebar-mount"></div>
+  <main class="main-content" id="content">
+    <div class="loading">Cargando reviews…</div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="business-auth.js"></script>
+<script>
+let currentAccount = null;
+
+async function init() {
+  const session = await requireAuth();
+  if (!session) return;
+
+  const account = await getBusinessAccount(session.user.id);
+  currentAccount = account;
+  document.getElementById('sidebar-mount').innerHTML = buildSidebar(account, '/business/reviews');
+
+  const canRespond = (account?.plan === 'pro' || account?.plan === 'premium') && account?.status === 'verified';
+
+  // Fetch posts + existing responses
+  const posts = await fetchRestaurantPosts(account);
+
+  let responsesMap = {};
+  if (posts.length > 0) {
+    const postIds = posts.map(p => p.id);
+    const { data: responses } = await sb
+      .from('business_review_responses')
+      .select('*')
+      .in('post_id', postIds);
+    (responses ?? []).forEach(r => { responsesMap[r.post_id] = r; });
+  }
+
+  const content = document.getElementById('content');
+
+  if (posts.length === 0) {
+    content.innerHTML = `
+      <div class="page-header">
+        <div class="page-label">Reviews</div>
+        <h1 class="page-title">Todas las menciones</h1>
+      </div>
+      <div class="empty">Aún no hay posts sobre tu restaurante en Yumlist.</div>
+    `;
+    initCursor();
+    return;
+  }
+
+  const reviewsHtml = posts.map(p => {
+    const user    = p.profiles ?? {};
+    const photos  = Array.isArray(p.photos) ? p.photos : (p.photo_url ? [p.photo_url] : []);
+    const photoHtml = photos[0] ? `<img src="${photos[0]}" class="review-photo" alt="" loading="lazy">` : '';
+    const tags = (p.dish_tags ?? p.tags ?? []).slice(0, 5).map(t => `<span class="tag">${t}</span>`).join('');
+    const food    = p.rating_food    ?? p.nota_comida    ?? p.nota ?? null;
+    const service = p.rating_service ?? p.nota_servicio ?? null;
+    const price   = p.rating_price   ?? p.nota_precio   ?? null;
+
+    const ratingsHtml = [
+      food    != null ? `<div class="rating-item"><div class="rating-dot"></div>Comida ${food}</div>` : '',
+      service != null ? `<div class="rating-item"><div class="rating-dot"></div>Servicio ${service}</div>` : '',
+      price   != null ? `<div class="rating-item"><div class="rating-dot"></div>Precio ${price}</div>` : '',
+    ].join('');
+
+    const existingResponse = responsesMap[p.id];
+
+    let responseSection = '';
+    if (existingResponse) {
+      responseSection = `
+        <div class="review-response">
+          <div class="review-response-label">Respuesta del restaurante</div>
+          <div class="review-response-text">${existingResponse.respuesta}</div>
+        </div>`;
+    } else if (canRespond) {
+      responseSection = `
+        <button class="btn-sm" onclick="openResponseForm('${p.id}')">Responder</button>
+        <div class="response-form" id="rf-${p.id}">
+          <textarea class="form-input" id="rt-${p.id}" placeholder="Escribe tu respuesta..." style="margin-top:8px;margin-bottom:8px"></textarea>
+          <div style="display:flex;gap:8px">
+            <button class="btn-sm" onclick="submitResponse('${p.id}', '${account.id}')">Publicar respuesta</button>
+            <button class="btn-sm" onclick="closeResponseForm('${p.id}')">Cancelar</button>
+          </div>
+          <div id="rm-${p.id}" style="margin-top:6px;font-size:12px"></div>
+        </div>`;
+    } else {
+      const tooltip = account?.status !== 'verified'
+        ? 'Disponible cuando tu cuenta esté verificada.'
+        : 'Disponible en el plan Pro. Actualiza tu plan para responder a tus clientes.';
+      responseSection = `<button class="btn-sm" disabled data-tooltip="${tooltip}">Responder</button>`;
+    }
+
+    return `<div class="review-card" id="card-${p.id}">
+      <div class="review-header">
+        <div class="review-user">
+          <div class="review-avatar">${user.avatar_url ? `<img src="${user.avatar_url}" alt="">` : ''}</div>
+          <div>
+            <div class="review-username">${user.username ?? user.display_name ?? 'Usuario'}</div>
+            <div class="review-date">${formatDate(p.created_at)}</div>
+          </div>
+        </div>
+      </div>
+      ${photoHtml}
+      ${ratingsHtml ? `<div class="review-ratings">${ratingsHtml}</div>` : ''}
+      ${p.description ? `<div class="review-description">${p.description}</div>` : ''}
+      ${tags ? `<div class="review-tags">${tags}</div>` : ''}
+      ${responseSection}
+    </div>`;
+  }).join('');
+
+  content.innerHTML = `
+    <div class="page-header">
+      <div class="page-label">Reviews</div>
+      <h1 class="page-title">Todas las menciones <span style="font-family:var(--sans);font-size:18px;font-weight:300;color:var(--muted);letter-spacing:0">(${posts.length})</span></h1>
+    </div>
+    ${(!canRespond && account?.status === 'verified') ? `<div class="alert alert-info" style="margin-bottom:24px">Para responder a las reviews necesitas el plan Pro o Premium. <a href="/business/planes" class="auth-link">Ver planes →</a></div>` : ''}
+    <div class="reviews-list">${reviewsHtml}</div>
+  `;
+
+  initCursor();
+}
+
+function openResponseForm(postId) {
+  document.getElementById(`rf-${postId}`).classList.add('open');
+}
+
+function closeResponseForm(postId) {
+  document.getElementById(`rf-${postId}`).classList.remove('open');
+}
+
+async function submitResponse(postId, businessId) {
+  const textarea = document.getElementById(`rt-${postId}`);
+  const msgEl    = document.getElementById(`rm-${postId}`);
+  const respuesta = textarea?.value.trim();
+
+  if (!respuesta) {
+    msgEl.textContent = 'Escribe algo antes de publicar.';
+    msgEl.style.color = 'var(--clay)';
+    return;
+  }
+
+  msgEl.textContent = '...';
+  msgEl.style.color = 'var(--muted)';
+
+  const { error } = await sb.from('business_review_responses').insert({ post_id: postId, business_id: businessId, respuesta });
+
+  if (error) {
+    msgEl.textContent = 'Error al publicar. Inténtalo de nuevo.';
+    msgEl.style.color = 'var(--clay)';
+    return;
+  }
+
+  // Replace response section with the published response
+  const card = document.getElementById(`card-${postId}`);
+  const rfEl = document.getElementById(`rf-${postId}`);
+  const btn  = rfEl?.previousElementSibling;
+
+  if (btn) btn.remove();
+  if (rfEl) rfEl.remove();
+
+  const responseDiv = document.createElement('div');
+  responseDiv.className = 'review-response';
+  responseDiv.innerHTML = `
+    <div class="review-response-label">Respuesta del restaurante</div>
+    <div class="review-response-text">${respuesta}</div>
+  `;
+  card.appendChild(responseDiv);
+}
+
+init();
+</script>
+</body>
+</html>
