@@ -49,6 +49,12 @@ async function init() {
   const account = await getBusinessAccount(session.user.id);
   document.getElementById('sidebar-mount').innerHTML = buildSidebar(account, '/business/analytics');
 
+  if (!account) {
+    document.getElementById('content').innerHTML = `<div class="alert alert-warning">No encontramos tu cuenta de restaurante. <a href="/business/registro" class="auth-link">Completar registro →</a></div>`;
+    initCursor();
+    return;
+  }
+
   const plan   = account?.plan ?? 'free';
   const isPro  = plan === 'pro' || plan === 'premium';
   const isPrem = plan === 'premium';

@@ -6,6 +6,7 @@
     { "source": "/business/login",        "destination": "/business/login.html" },
     { "source": "/business/verificacion", "destination": "/business/verificacion.html" },
     { "source": "/business/dashboard",    "destination": "/business/dashboard.html" },
+    { "source": "/business/perfil",       "destination": "/business/perfil.html" },
     { "source": "/business/reviews",      "destination": "/business/reviews.html" },
     { "source": "/business/analytics",    "destination": "/business/analytics.html" },
     { "source": "/business/planes",       "destination": "/business/planes.html" },

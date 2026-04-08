@@ -32,6 +32,12 @@ async function init() {
   currentAccount = account;
   document.getElementById('sidebar-mount').innerHTML = buildSidebar(account, '/business/reviews');
 
+  if (!account) {
+    document.getElementById('content').innerHTML = `<div class="alert alert-warning">No encontramos tu cuenta de restaurante. <a href="/business/registro" class="auth-link">Completar registro →</a></div>`;
+    initCursor();
+    return;
+  }
+
   const canRespond = (account?.plan === 'pro' || account?.plan === 'premium') && account?.status === 'verified';
 
   // Fetch posts + existing responses

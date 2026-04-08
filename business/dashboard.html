@@ -31,6 +31,14 @@ async function init() {
 
   const content = document.getElementById('content');
 
+  if (!account) {
+    content.innerHTML = `<div class="alert alert-warning">No encontramos tu cuenta de restaurante.
+      Esto puede deberse a que el registro no se completó o a políticas de acceso en Supabase.
+      <a href="/business/registro" class="auth-link" style="margin-left:6px">Completar registro →</a></div>`;
+    initCursor();
+    return;
+  }
+
   // Pending banner
   const pendingBanner = account?.status !== 'verified'
     ? `<div class="alert alert-warning" style="margin-bottom:32px">
