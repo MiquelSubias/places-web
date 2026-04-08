@@ -195,18 +195,44 @@
     }
 
     // 2. Insert business account
+    // Note: if Supabase email confirmation is enabled, the session may not be active yet.
+    // Disable email confirmation in Supabase Auth settings for the insert to work immediately.
+    console.log('[registro] Attempting business_accounts insert for user:', userId);
+
     const { data: accountData, error: insertError } = await sb
       .from('business_accounts')
-      .insert({ user_id: userId, nombre, cif, titular, telefono, ciudad, direccion, lat, lng, status: 'pending', plan: 'free' })
+      .insert({
+        user_id:         userId,
+        email:           email,
+        restaurant_name: nombre,
+        cif:             cif,
+        owner_name:      titular,
+        phone:           telefono,
+        city:            ciudad,
+        lat:             lat,
+        lng:             lng,
+        status:          'pending',
+        plan:            'free'
+      })
       .select('id')
       .single();
 
     if (insertError) {
-      console.error('business_accounts insert error:', insertError);
-      // Don't block flow — user can complete profile later
+      console.error('[registro] business_accounts insert failed:', insertError);
+      alerts.innerHTML = `<div class="alert alert-error">
+        Tu cuenta se ha creado pero no pudimos guardar los datos del restaurante.<br>
+        <strong>${insertError.message}</strong><br>
+        <small style="opacity:.65">Código: ${insertError.code} — Abre la consola del navegador para más detalles.
+        Causa habitual: confirmación de email activa en Supabase (desactívala en Auth → Settings) o política RLS faltante.</small>
+      </div>`;
+      btn.textContent = 'Crear cuenta';
+      btn.disabled    = false;
+      return; // Do not redirect until insert succeeds
     }
 
-    // Store business_id for verificacion page (useful if email confirmation delays session)
+    console.log('[registro] business_accounts insert OK, id:', accountData?.id);
+
+    // Store business_id for verificacion page
     if (accountData?.id) {
       sessionStorage.setItem('biz_id', accountData.id);
     }
