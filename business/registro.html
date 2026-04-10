@@ -195,47 +195,98 @@
     }
 
     // 2. Insert business account
-    // Note: if Supabase email confirmation is enabled, the session may not be active yet.
-    // Disable email confirmation in Supabase Auth settings for the insert to work immediately.
-    console.log('[registro] Attempting business_accounts insert for user:', userId);
+    // We use a direct fetch() instead of sb.from().insert() to explicitly control
+    // the Authorization header. When email confirmation is enabled in Supabase,
+    // signUp() returns session=null and the SDK client has no active JWT — causing
+    // the insert to run as 'anon' and fail RLS. By passing the user's access_token
+    // directly (when available) we ensure the insert is always authenticated.
+    const userSession  = authData.session;
+    const accessToken  = userSession?.access_token ?? SUPABASE_KEY;
+    const sessionAvail = !!userSession;
 
-    const { data: accountData, error: insertError } = await sb
-      .from('business_accounts')
-      .insert({
-        user_id:         userId,
-        email:           email,
-        restaurant_name: nombre,
-        cif:             cif,
-        owner_name:      titular,
-        phone:           telefono,
-        city:            ciudad,
-        lat:             lat,
-        lng:             lng,
-        status:          'pending',
-        plan:            'free'
-      })
-      .select('id')
-      .single();
+    console.log('[registro] signUp OK — user_id:', userId);
+    console.log('[registro] Session returned by signUp:', sessionAvail,
+      sessionAvail ? '(email confirmation OFF — good)' : '(email confirmation ON — using anon key as fallback)');
+    console.log('[registro] Inserting into business_accounts...');
 
-    if (insertError) {
-      console.error('[registro] business_accounts insert failed:', insertError);
-      alerts.innerHTML = `<div class="alert alert-error">
-        Tu cuenta se ha creado pero no pudimos guardar los datos del restaurante.<br>
-        <strong>${insertError.message}</strong><br>
-        <small style="opacity:.65">Código: ${insertError.code} — Abre la consola del navegador para más detalles.
-        Causa habitual: confirmación de email activa en Supabase (desactívala en Auth → Settings) o política RLS faltante.</small>
-      </div>`;
-      btn.textContent = 'Crear cuenta';
+    let insertedId = null;
+    try {
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/business_accounts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'apikey':        SUPABASE_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'Prefer':        'return=representation'
+        },
+        body: JSON.stringify({
+          id:              userId,
+          email:           email,
+          restaurant_name: nombre,
+          cif:             cif,
+          owner_name:      titular,
+          phone:           telefono,
+          city:            ciudad,
+          lat:             lat,
+          lng:             lng,
+          status:          'pending',
+          plan:            'free'
+        })
+      });
+
+      const insertBody = await insertRes.json();
+      console.log('[registro] Insert HTTP status:', insertRes.status);
+      console.log('[registro] Insert response body:', insertBody);
+
+      if (!insertRes.ok) {
+        const errMsg  = insertBody?.message ?? insertBody?.error_description ?? insertBody?.error ?? JSON.stringify(insertBody);
+        const errCode = insertBody?.code    ?? insertRes.status;
+
+        const hint = !sessionAvail
+          ? `<br><strong>Causa detectada:</strong> la confirmación de email está activa en Supabase.
+             El insert se ejecutó como rol <code>anon</code> y la política RLS lo bloqueó.<br>
+             <strong>Solución:</strong> en tu panel Supabase → Authentication → Settings → desactiva
+             <em>"Enable email confirmations"</em>. O añade la siguiente política RLS:<br>
+             <code>CREATE POLICY "insert_own" ON business_accounts FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);</code>`
+          : `<br>Revisa las políticas RLS de la tabla <code>business_accounts</code> en Supabase.`;
+
+        alerts.innerHTML = `<div class="alert alert-error">
+          Tu cuenta de Auth se creó correctamente, pero no pudimos guardar los datos del restaurante.<br>
+          <strong>Error: ${errMsg}</strong> (código ${errCode})
+          ${hint}
+        </div>`;
+        btn.textContent = 'Intentar de nuevo';
+        btn.disabled    = false;
+        return;
+      }
+
+      // Success — extract the inserted row's id
+      const row = Array.isArray(insertBody) ? insertBody[0] : insertBody;
+      insertedId = row?.id ?? null;
+      console.log('[registro] Insert OK — business_id:', insertedId);
+
+    } catch (fetchErr) {
+      console.error('[registro] Network error during insert:', fetchErr);
+      alerts.innerHTML = `<div class="alert alert-error">Error de red al guardar los datos: ${fetchErr.message}</div>`;
+      btn.textContent = 'Intentar de nuevo';
       btn.disabled    = false;
-      return; // Do not redirect until insert succeeds
+      return;
     }
 
-    console.log('[registro] business_accounts insert OK, id:', accountData?.id);
-
-    // Store business_id for verificacion page
-    if (accountData?.id) {
-      sessionStorage.setItem('biz_id', accountData.id);
+    // 3. If signUp returned a session, make sure the SDK client uses it
+    //    so that the user is authenticated in subsequent pages without having to log in.
+    if (userSession) {
+      await sb.auth.setSession({
+        access_token:  userSession.access_token,
+        refresh_token: userSession.refresh_token
+      });
+      console.log('[registro] Session set in Supabase client — user will arrive at dashboard authenticated.');
+    } else {
+      console.warn('[registro] No session from signUp — user will need to log in after email confirmation.');
     }
+
+    // Store business_id for verificacion.html (fallback when session is delayed)
+    if (insertedId) sessionStorage.setItem('biz_id', insertedId);
 
     window.location.replace('/business/verificacion');
   });

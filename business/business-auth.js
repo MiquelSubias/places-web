@@ -28,12 +28,12 @@ async function getBusinessAccount(userId) {
   const { data, error } = await sb
     .from('business_accounts')
     .select('*')
-    .eq('user_id', userId)
+    .eq('id', userId)
     .single();
   if (error && error.code !== 'PGRST116') {
     // PGRST116 = no rows found (expected for new users)
     console.warn('[business-auth] getBusinessAccount error:', error.message,
-      '\n→ Comprueba que la tabla business_accounts existe y que RLS permite SELECT con auth.uid() = user_id');
+      '\n→ Comprueba que la tabla business_accounts existe y que RLS permite SELECT con auth.uid() = id');
   }
   return data ?? null;
 }
@@ -108,7 +108,7 @@ function buildSidebar(account, activePage) {
         </svg>
       </a>
     </div>
-    <div class="sidebar-restaurant">${account?.nombre ?? '—'}</div>
+    <div class="sidebar-restaurant">${account?.restaurant_name ?? '—'}</div>
     <div class="sidebar-status">
       <span class="badge ${badgeClass}">${badgeText}</span>
       <span class="badge badge-plan">${planLabel}</span>
