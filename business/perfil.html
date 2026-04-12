@@ -270,9 +270,10 @@ function renderPhotos() {
   let html = '';
 
   // Existing saved photos
-  photoPaths.forEach((path, i) => {
+  photoPaths.forEach((path) => {
     if (removePhotos.includes(path)) return;
-    const url = `${SUPABASE_URL}/storage/v1/object/public/business-docs/${path}`;
+    const { data: pubData } = sb.storage.from('business-docs').getPublicUrl(path);
+    const url = pubData.publicUrl;
     html += `<div class="photo-slot">
       <img src="${url}" alt="">
       <button class="photo-remove" onclick="removeSavedPhoto('${path}')" title="Eliminar">×</button>
