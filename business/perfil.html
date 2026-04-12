@@ -161,7 +161,7 @@ async function init() {
   }
 
   // Existing photo paths
-  photoPaths = Array.isArray(account.fotos) ? [...account.fotos] : [];
+  photoPaths = Array.isArray(account.photos) ? [...account.photos] : [];
 
   renderPage(account);
   initCursor();
@@ -187,20 +187,25 @@ function renderPage(account) {
       <!-- Descripción -->
       <div class="section-sep">Sobre el restaurante</div>
       <div class="form-group">
+        <label class="form-label" for="restaurant_name">Nombre del restaurante</label>
+        <input class="form-input" type="text" id="restaurant_name" placeholder="Nombre público del restaurante" value="${account.restaurant_name ?? ''}">
+      </div>
+
+      <div class="form-group">
         <label class="form-label" for="descripcion">Descripción</label>
         <textarea class="form-input" id="descripcion" maxlength="300" rows="4"
-          placeholder="Cuéntanos qué hace especial a tu restaurante...">${account.descripcion ?? ''}</textarea>
-        <div class="char-counter" id="char-count">${(account.descripcion ?? '').length}/300</div>
+          placeholder="Cuéntanos qué hace especial a tu restaurante...">${account.description ?? ''}</textarea>
+        <div class="char-counter" id="char-count">${(account.description ?? '').length}/300</div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="tipo_cocina">Tipo de cocina</label>
-          <input class="form-input" type="text" id="tipo_cocina" placeholder="Ej: Italiana, Japonesa, Mediterránea…" value="${account.tipo_cocina ?? ''}">
+          <input class="form-input" type="text" id="tipo_cocina" placeholder="Ej: Italiana, Japonesa, Mediterránea…" value="${account.cuisine_type ?? ''}">
         </div>
         <div class="form-group">
           <label class="form-label" for="horario">Horario</label>
-          <input class="form-input" type="text" id="horario" placeholder="Ej: Lun–Vie 13:00–23:00" value="${account.horario ?? ''}">
+          <input class="form-input" type="text" id="horario" placeholder="Ej: Lun–Vie 13:00–23:00" value="${account.schedule ?? ''}">
         </div>
       </div>
 
@@ -208,7 +213,7 @@ function renderPage(account) {
       <div class="section-sep">Presencia online</div>
       <div class="form-group">
         <label class="form-label" for="reservas_url">Enlace a reservas</label>
-        <input class="form-input" type="url" id="reservas_url" placeholder="https://…" value="${account.reservas_url ?? ''}">
+        <input class="form-input" type="url" id="reservas_url" placeholder="https://…" value="${account.booking_url ?? ''}">
       </div>
       <div class="form-group">
         <label class="form-label" for="instagram">Instagram</label>
@@ -251,6 +256,10 @@ function renderPage(account) {
     counter.textContent = `${len}/300`;
     counter.className = 'char-counter' + (len > 280 ? ' warn' : '') + (len >= 300 ? ' over' : '');
   });
+  // Inicializar counter con valor real de la BD
+  const initLen = desc.value.length;
+  counter.textContent = `${initLen}/300`;
+  counter.className = 'char-counter' + (initLen > 280 ? ' warn' : '') + (initLen >= 300 ? ' over' : '');
 }
 
 function renderPhotos() {
@@ -384,13 +393,14 @@ async function saveProfile() {
 
   // 3. Update business_accounts
   const updates = {
-    fotos:        photoPaths.filter(p => !removePhotos.includes(p)),
-    descripcion:  document.getElementById('descripcion').value.trim() || null,
-    tipo_cocina:  document.getElementById('tipo_cocina').value.trim() || null,
-    horario:      document.getElementById('horario').value.trim() || null,
-    reservas_url: document.getElementById('reservas_url').value.trim() || null,
-    instagram:    document.getElementById('instagram').value.trim().replace(/^@/, '') || null,
-    menu_url:     menuUrl,
+    restaurant_name: document.getElementById('restaurant_name').value.trim() || null,
+    photos:          photoPaths.filter(p => !removePhotos.includes(p)),
+    description:     document.getElementById('descripcion').value.trim() || null,
+    cuisine_type:    document.getElementById('tipo_cocina').value.trim() || null,
+    schedule:        document.getElementById('horario').value.trim() || null,
+    booking_url:     document.getElementById('reservas_url').value.trim() || null,
+    instagram:       document.getElementById('instagram').value.trim().replace(/^@/, '') || null,
+    menu_url:        menuUrl,
   };
 
   const { error: updateError } = await sb

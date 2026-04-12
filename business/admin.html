@@ -39,7 +39,7 @@ async function init() {
 
   // Build minimal sidebar for admin
   document.getElementById('sidebar-mount').innerHTML = buildSidebar(
-    { nombre: 'Admin', status: 'verified', plan: 'premium' },
+    { restaurant_name: 'Admin', status: 'verified', plan: 'premium' },
     '/business/admin'
   );
 
@@ -53,7 +53,7 @@ async function loadPending() {
   // Fetch pending docs joined with business accounts
   const { data: docs, error } = await sb
     .from('business_verification_docs')
-    .select('*, business_accounts(id, nombre, cif, titular, ciudad, user_id, status)')
+    .select('*, business_accounts(id, restaurant_name, cif, owner_name, city, status)')
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
 
@@ -72,11 +72,11 @@ async function loadPending() {
     const acc = doc.business_accounts ?? {};
     return `
       <div class="verification-card" id="doc-${doc.id}">
-        <div class="verification-name">${acc.nombre ?? '—'}</div>
+        <div class="verification-name">${acc.restaurant_name ?? '—'}</div>
         <div class="verification-meta">
           <span>CIF: ${acc.cif ?? '—'}</span>
-          <span>Titular: ${acc.titular ?? '—'}</span>
-          <span>Ciudad: ${acc.ciudad ?? '—'}</span>
+          <span>Titular: ${acc.owner_name ?? '—'}</span>
+          <span>Ciudad: ${acc.city ?? '—'}</span>
           <span>Recibido: ${formatDate(doc.created_at)}</span>
         </div>
         <div style="margin-bottom:12px">
@@ -86,12 +86,12 @@ async function loadPending() {
           <span id="doc-url-${doc.id}" style="font-size:12px;color:rgba(245,240,232,.35);margin-left:8px"></span>
         </div>
         <div class="verification-actions">
-          <button class="btn-approve" onclick="approveDoc('${doc.id}', '${acc.id}', '${acc.user_id}')">Aprobar</button>
+          <button class="btn-approve" onclick="approveDoc('${doc.id}', '${acc.id}', '${acc.id}')">Aprobar</button>
           <button class="btn-reject"  onclick="toggleReject('${doc.id}')">Rechazar</button>
         </div>
         <div class="reject-form" id="rf-${doc.id}">
           <textarea class="form-input" id="rt-${doc.id}" placeholder="Motivo del rechazo (se enviará por email)..." style="margin-top:8px;margin-bottom:8px"></textarea>
-          <button class="btn-sm" onclick="rejectDoc('${doc.id}', '${acc.id}', '${acc.user_id}')">Confirmar rechazo</button>
+          <button class="btn-sm" onclick="rejectDoc('${doc.id}', '${acc.id}', '${acc.id}')">Confirmar rechazo</button>
           <div id="rm-${doc.id}" style="margin-top:6px;font-size:12px;color:var(--muted)"></div>
         </div>
         <div id="action-msg-${doc.id}" style="margin-top:10px;font-size:13px"></div>
