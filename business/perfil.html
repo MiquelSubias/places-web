@@ -126,10 +126,136 @@
     padding-left: 4px;
   }
   .instagram-prefix .form-input:focus { border-color: transparent; }
+
+  /* ── "Ver como visitante" button ─────────────────────────── */
+  .btn-visitor {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: 1px solid rgba(245,240,232,.22);
+    border-radius: 10px;
+    background: transparent;
+    color: rgba(245,240,232,.6);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    cursor: none;
+    transition: border-color .2s, color .2s, background .2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .btn-visitor:hover {
+    border-color: rgba(245,240,232,.45);
+    color: #F5F0E8;
+    background: rgba(245,240,232,.05);
+  }
+
+  /* ── Preview modal overlay ───────────────────────────────── */
+  #preview-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(14,13,12,.9);
+    backdrop-filter: blur(10px);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #preview-modal.open { display: flex; }
+
+  #preview-modal-close {
+    align-self: center;
+    position: relative;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(245,240,232,.18);
+    background: rgba(245,240,232,.06);
+    color: rgba(245,240,232,.7);
+    font-size: 16px;
+    cursor: none;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s, border-color .2s, color .2s;
+    /* Position close button top-right relative to the phone frame */
+    margin-bottom: -6px;
+    align-self: flex-end;
+    /* Offset to align outside the phone */
+    margin-right: calc(50vw - 375px/2 - 48px);
+  }
+  #preview-modal-close:hover {
+    background: rgba(245,240,232,.12);
+    border-color: rgba(245,240,232,.35);
+    color: #F5F0E8;
+  }
+
+  /* Phone frame */
+  #preview-phone {
+    width: 375px;
+    max-width: calc(100vw - 32px);
+    height: 75vh;
+    border-radius: 40px;
+    border: 2px solid rgba(245,240,232,.15);
+    background: #0e0d0c;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    position: relative;
+    box-shadow: 0 32px 80px rgba(0,0,0,.6);
+  }
+  #preview-phone::-webkit-scrollbar { display: none; }
+
+  /* Sticky action bar inside phone */
+  #preview-actions {
+    position: sticky;
+    bottom: 0;
+    background: #1E1D1B;
+    border-top: 1px solid rgba(245,240,232,.08);
+    padding: 12px 20px 20px;
+    display: flex;
+    gap: 12px;
+    z-index: 10;
+  }
+  .preview-action-btn {
+    flex: 1;
+    height: 40px;
+    border-radius: 999px;
+    border: 1px solid rgba(245,240,232,.3);
+    background: transparent;
+    color: #F5F0E8;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 7px;
+    cursor: default;
+  }
 </style>
 </head>
 <body>
 <div class="cursor" id="cursor"></div>
+
+<!-- ── Preview modal ───────────────────────────────────────── -->
+<div id="preview-modal" role="dialog" aria-modal="true" aria-label="Vista de visitante">
+  <button id="preview-modal-close" onclick="closePreview()" title="Cerrar">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/>
+    </svg>
+  </button>
+  <div id="preview-phone">
+    <div id="preview-frame"></div>
+    <div id="preview-actions">
+      <button class="preview-action-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        Quiero ir
+      </button>
+      <button class="preview-action-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Cómo llegar
+      </button>
+    </div>
+  </div>
+</div>
 
 <div class="app-layout">
   <div id="sidebar-mount"></div>
@@ -170,9 +296,18 @@ async function init() {
 function renderPage(account) {
   const content = document.getElementById('content');
   content.innerHTML = `
-    <div class="page-header">
-      <div class="page-label">Configuración</div>
-      <h1 class="page-title">Mi perfil</h1>
+    <div class="page-header" style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:32px;">
+      <div>
+        <div class="page-label">Configuración</div>
+        <h1 class="page-title" style="margin-bottom:0">Mi perfil</h1>
+      </div>
+      <button class="btn-visitor" onclick="openPreview()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+        Ver como visitante
+      </button>
     </div>
 
     <div id="alerts"></div>
@@ -256,7 +391,6 @@ function renderPage(account) {
     counter.textContent = `${len}/300`;
     counter.className = 'char-counter' + (len > 280 ? ' warn' : '') + (len >= 300 ? ' over' : '');
   });
-  // Inicializar counter con valor real de la BD
   const initLen = desc.value.length;
   counter.textContent = `${initLen}/300`;
   counter.className = 'char-counter' + (initLen > 280 ? ' warn' : '') + (initLen >= 300 ? ' over' : '');
@@ -266,7 +400,6 @@ function renderPhotos() {
   const grid = document.getElementById('photos-grid');
   if (!grid) return;
 
-  const totalSlots = photoPaths.length + newPhotoFiles.length;
   let html = '';
 
   // Existing saved photos
@@ -416,7 +549,6 @@ async function saveProfile() {
     return;
   }
 
-  // Update local account object
   Object.assign(bizAccount, updates);
 
   btn.disabled    = false;
@@ -430,6 +562,128 @@ function showAlert(msg, type) {
   if (!alerts) return;
   alerts.innerHTML = `<div class="alert alert-${type}" style="margin-bottom:20px">${msg}</div>`;
   setTimeout(() => { alerts.innerHTML = ''; }, 4000);
+}
+
+// ── Visitor preview ───────────────────────────────────────────
+
+let _previewBlobUrls = [];
+
+function openPreview() {
+  // Read current form values
+  const name        = document.getElementById('restaurant_name')?.value.trim() || '';
+  const description = document.getElementById('descripcion')?.value.trim() || '';
+  const cuisine     = document.getElementById('tipo_cocina')?.value.trim() || '';
+  const schedule    = document.getElementById('horario')?.value.trim() || '';
+  const booking     = document.getElementById('reservas_url')?.value.trim() || '';
+  const instagram   = document.getElementById('instagram')?.value.trim().replace(/^@/, '') || '';
+  const hasNewMenu  = !!(document.getElementById('menu_file')?.files?.[0]);
+  const hasMenu     = hasNewMenu || !!(bizAccount?.menu_url);
+  const phone       = bizAccount?.phone || '';
+
+  // First available photo
+  _previewBlobUrls.forEach(URL.revokeObjectURL);
+  _previewBlobUrls = [];
+
+  let heroUrl = '';
+  const activePaths = photoPaths.filter(p => !removePhotos.includes(p));
+
+  if (newPhotoFiles.length > 0) {
+    heroUrl = URL.createObjectURL(newPhotoFiles[0]);
+    _previewBlobUrls.push(heroUrl);
+  } else if (activePaths.length > 0) {
+    const { data } = sb.storage.from('business-docs').getPublicUrl(activePaths[0]);
+    heroUrl = data.publicUrl;
+  }
+
+  document.getElementById('preview-frame').innerHTML = buildPreviewHTML({
+    name, description, cuisine, schedule, booking, instagram, hasMenu, phone, heroUrl
+  });
+
+  const modal = document.getElementById('preview-modal');
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Scroll the phone frame to top
+  document.getElementById('preview-phone').scrollTop = 0;
+}
+
+function closePreview() {
+  document.getElementById('preview-modal').classList.remove('open');
+  document.body.style.overflow = '';
+  _previewBlobUrls.forEach(URL.revokeObjectURL);
+  _previewBlobUrls = [];
+}
+
+// Close on backdrop click (not on phone frame)
+document.getElementById('preview-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePreview();
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closePreview();
+});
+
+function buildPreviewHTML({ name, description, cuisine, schedule, booking, instagram, hasMenu, phone, heroUrl }) {
+  const displayName = name || 'Tu restaurante';
+
+  // Hero
+  const hero = heroUrl
+    ? `<div style="height:200px;background:url('${heroUrl.replace(/'/g, "\\'")}') center/cover no-repeat;flex-shrink:0;"></div>`
+    : `<div style="height:200px;background:#1E1D1B;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0 24px;">
+         <span style="font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;color:#F5F0E8;font-weight:300;text-align:center;line-height:1.2;">${esc(displayName)}</span>
+       </div>`;
+
+  // Header
+  const header = `
+    <div style="padding:20px 20px 16px;">
+      <div style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#B89F87;margin-bottom:8px;">RESTAURANTE VERIFICADO</div>
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;color:#F5F0E8;font-weight:300;letter-spacing:-0.5px;line-height:1.15;${cuisine ? 'margin-bottom:6px;' : ''}">${esc(displayName)}</div>
+      ${cuisine ? `<div style="font-family:'DM Sans',sans-serif;font-size:14px;color:#B89F87;">${esc(cuisine)}</div>` : ''}
+    </div>`;
+
+  // Social placeholder
+  const social = `
+    <div style="margin:0 20px 20px;">
+      <div style="background:#1E1D1B;border-radius:16px;padding:20px;">
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;color:#F5F0E8;font-weight:300;margin-bottom:8px;">Aún nadie de tu círculo ha estado aquí</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:14px;color:#B89F87;line-height:1.5;">Así se verá cuando tus clientes compartan su experiencia en Yumlist.</div>
+      </div>
+    </div>`;
+
+  // Info rows
+  const rows = [];
+  if (cuisine)   rows.push(['TIPO DE COCINA', esc(cuisine)]);
+  if (schedule)  rows.push(['HORARIO', esc(schedule)]);
+  if (phone)     rows.push(['TELÉFONO', esc(phone)]);
+  if (instagram) rows.push(['INSTAGRAM', `@${esc(instagram)}`]);
+  if (hasMenu)   rows.push(['CARTA / MENÚ', 'Ver carta']);
+  if (booking)   rows.push(['RESERVAS', 'Reservar mesa']);
+
+  const infoSection = (description || rows.length > 0) ? `
+    <div style="margin:0 20px;padding-top:20px;border-top:1px solid rgba(245,240,232,.08);">
+      <div style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#B89F87;margin-bottom:14px;">INFORMACIÓN</div>
+      ${description ? `<div style="font-family:'DM Sans',sans-serif;font-size:15px;color:#F5F0E8;line-height:1.6;margin-bottom:${rows.length > 0 ? '4px' : '20px'};">${esc(description)}</div>` : ''}
+      ${rows.map(([label, value]) => `
+        <div style="padding:13px 0;border-bottom:1px solid rgba(245,240,232,.08);">
+          <div style="font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#B89F87;margin-bottom:4px;">${label}</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:15px;color:#F5F0E8;">${value}</div>
+        </div>`).join('')}
+    </div>` : '';
+
+  // Bottom spacer so content isn't hidden behind sticky bar
+  const spacer = `<div style="height:20px;"></div>`;
+
+  return hero + header + social + infoSection + spacer;
+}
+
+// Escape HTML special chars for inline content
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 init();
