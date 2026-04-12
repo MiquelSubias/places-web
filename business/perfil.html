@@ -165,6 +165,7 @@
     gap: 14px;
   }
   #preview-modal.open { display: flex; }
+  #preview-modal, #preview-modal * { cursor: auto !important; }
 
   #preview-modal-close {
     align-self: center;
@@ -602,6 +603,8 @@ function openPreview() {
   const modal = document.getElementById('preview-modal');
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
+  document.body.style.cursor = 'auto';
+  document.getElementById('cursor').style.display = 'none';
 
   // Scroll the phone frame to top
   document.getElementById('preview-phone').scrollTop = 0;
@@ -610,6 +613,8 @@ function openPreview() {
 function closePreview() {
   document.getElementById('preview-modal').classList.remove('open');
   document.body.style.overflow = '';
+  document.body.style.cursor = '';
+  document.getElementById('cursor').style.display = '';
   _previewBlobUrls.forEach(URL.revokeObjectURL);
   _previewBlobUrls = [];
 }
