@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="business.css">
 </head>
 <body>
-<div class="cursor" id="cursor"></div>
+
 
 <div class="app-layout">
   <div id="sidebar-mount"></div>
@@ -35,7 +35,6 @@ async function init() {
     content.innerHTML = `<div class="alert alert-warning">No encontramos tu cuenta de restaurante.
       Esto puede deberse a que el registro no se completó o a políticas de acceso en Supabase.
       <a href="/business/registro" class="auth-link" style="margin-left:6px">Completar registro →</a></div>`;
-    initCursor();
     return;
   }
 
@@ -160,7 +159,6 @@ async function init() {
     </div>` : ''}
   `;
 
-  initCursor();
 }
 
 init();

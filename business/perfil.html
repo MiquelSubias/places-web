@@ -44,7 +44,7 @@
     border: none;
     color: var(--cream);
     font-size: 12px;
-    cursor: none;
+    cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: background .2s;
     line-height: 1;
@@ -56,7 +56,7 @@
     border-radius: 10px;
     border: 1px dashed rgba(245,240,232,.2);
     background: rgba(245,240,232,.03);
-    cursor: none;
+    cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -69,7 +69,7 @@
     overflow: hidden;
   }
   .photo-add:hover { border-color: rgba(245,240,232,.4); background: rgba(245,240,232,.06); color: rgba(245,240,232,.6); }
-  .photo-add input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: none; }
+  .photo-add input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .photo-add svg { opacity: .5; }
 
   .char-counter {
@@ -140,7 +140,7 @@
     font-family: 'DM Sans', sans-serif;
     font-size: 13px;
     font-weight: 400;
-    cursor: none;
+    cursor: pointer;
     transition: border-color .2s, color .2s, background .2s;
     white-space: nowrap;
     flex-shrink: 0;
@@ -165,7 +165,6 @@
     gap: 14px;
   }
   #preview-modal.open { display: flex; }
-  #preview-modal, #preview-modal * { cursor: auto !important; }
 
   #preview-modal-close {
     align-self: center;
@@ -176,7 +175,7 @@
     background: rgba(245,240,232,.06);
     color: rgba(245,240,232,.7);
     font-size: 16px;
-    cursor: none;
+    cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: background .2s, border-color .2s, color .2s;
     /* Position close button top-right relative to the phone frame */
@@ -234,8 +233,6 @@
 </style>
 </head>
 <body>
-<div class="cursor" id="cursor"></div>
-
 <!-- ── Preview modal ───────────────────────────────────────── -->
 <div id="preview-modal" role="dialog" aria-modal="true" aria-label="Vista de visitante">
   <button id="preview-modal-close" onclick="closePreview()" title="Cerrar">
@@ -283,7 +280,6 @@ async function init() {
 
   if (!account) {
     document.getElementById('content').innerHTML = `<div class="alert alert-warning">No encontramos tu cuenta de restaurante. <a href="/business/registro" class="auth-link">Completar registro →</a></div>`;
-    initCursor();
     return;
   }
 
@@ -291,7 +287,6 @@ async function init() {
   photoPaths = Array.isArray(account.photos) ? [...account.photos] : [];
 
   renderPage(account);
-  initCursor();
 }
 
 function renderPage(account) {
@@ -603,8 +598,6 @@ function openPreview() {
   const modal = document.getElementById('preview-modal');
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
-  document.body.style.cursor = 'auto';
-  document.getElementById('cursor').style.display = 'none';
 
   // Scroll the phone frame to top
   document.getElementById('preview-phone').scrollTop = 0;
@@ -613,8 +606,6 @@ function openPreview() {
 function closePreview() {
   document.getElementById('preview-modal').classList.remove('open');
   document.body.style.overflow = '';
-  document.body.style.cursor = '';
-  document.getElementById('cursor').style.display = '';
   _previewBlobUrls.forEach(URL.revokeObjectURL);
   _previewBlobUrls = [];
 }

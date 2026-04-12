@@ -125,18 +125,6 @@ function buildSidebar(account, activePage) {
   </aside>`;
 }
 
-// ── Cursor ────────────────────────────────────────────────────────────────────
-
-function initCursor() {
-  const c = document.getElementById('cursor');
-  if (!c) return;
-  document.addEventListener('mousemove', e => { c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; });
-  document.querySelectorAll('a,button,input,textarea,select,[role="button"]').forEach(el => {
-    el.addEventListener('mouseenter', () => c.classList.add('big'));
-    el.addEventListener('mouseleave', () => c.classList.remove('big'));
-  });
-}
-
 // ── Email notifications ───────────────────────────────────────────────────────
 
 async function sendEmailNotification(to, subject, body) {

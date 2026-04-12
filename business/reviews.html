@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="business.css">
 </head>
 <body>
-<div class="cursor" id="cursor"></div>
+
 
 <div class="app-layout">
   <div id="sidebar-mount"></div>
@@ -34,7 +34,6 @@ async function init() {
 
   if (!account) {
     document.getElementById('content').innerHTML = `<div class="alert alert-warning">No encontramos tu cuenta de restaurante. <a href="/business/registro" class="auth-link">Completar registro →</a></div>`;
-    initCursor();
     return;
   }
 
@@ -63,7 +62,6 @@ async function init() {
       </div>
       <div class="empty">Aún no hay posts sobre tu restaurante en Yumlist.</div>
     `;
-    initCursor();
     return;
   }
 
@@ -136,7 +134,6 @@ async function init() {
     <div class="reviews-list">${reviewsHtml}</div>
   `;
 
-  initCursor();
 }
 
 function openResponseForm(postId) {

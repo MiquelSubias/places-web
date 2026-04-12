@@ -22,14 +22,14 @@
   .chart-wrap { position: relative; height: 200px; }
   .toggle-btn {
     font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-    background: none; border: none; color: rgba(245,240,232,.3); cursor: none;
+    background: none; border: none; color: rgba(245,240,232,.3); cursor: pointer;
     font-family: var(--sans); transition: color .2s; padding: 2px 0;
   }
   .toggle-btn:hover { color: rgba(245,240,232,.6); }
 </style>
 </head>
 <body>
-<div class="cursor" id="cursor"></div>
+
 
 <div class="app-layout">
   <div id="sidebar-mount"></div>
@@ -51,7 +51,6 @@ async function init() {
 
   if (!account) {
     document.getElementById('content').innerHTML = `<div class="alert alert-warning">No encontramos tu cuenta de restaurante. <a href="/business/registro" class="auth-link">Completar registro →</a></div>`;
-    initCursor();
     return;
   }
 
@@ -299,7 +298,6 @@ async function init() {
     });
   }
 
-  initCursor();
 }
 
 function toggleSection(btn) {
