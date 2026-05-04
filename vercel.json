@@ -11,6 +11,8 @@
     { "source": "/business/analytics",    "destination": "/business/analytics.html" },
     { "source": "/business/planes",       "destination": "/business/planes.html" },
     { "source": "/business/admin",        "destination": "/business/admin.html" },
-    { "source": "/reset-password",        "destination": "/reset-password.html" }
+    { "source": "/reset-password",        "destination": "/reset-password.html" },
+    { "source": "/privacy",               "destination": "/privacy.html" },
+    { "source": "/terms",                 "destination": "/terms.html" }
   ]
 }
